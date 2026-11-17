@@ -1,0 +1,15 @@
+TIAGO LEILÕES — CLOUDFLARE PAGES
+
+1. Envie o conteúdo desta pasta para Cloudflare Pages, incluindo a pasta functions.
+2. Crie um namespace Workers KV no Cloudflare.
+3. Em Workers & Pages > tiago-leiloes > Configurações > Bindings, associe o namespace ao nome IMOVEIS_KV.
+4. Crie uma variável secreta ADMIN_TOKEN com senha longa e aleatória.
+5. Faça nova implantação após configurar bindings.
+6. GET /api/lista retornará 404 até publicar a primeira lista.
+7. Para publicar CSV use PUT /api/lista com Authorization: Bearer SEU_TOKEN e X-CSV-Name: Lista_imoveis_RJ.csv.
+
+ATENÇÃO: o botão de importar CSV do HTML ainda não envia token e portanto não publica (401). É proposital: publicar sem autenticação permitiria que qualquer visitante substituísse a lista. A interface de administração autenticada precisa ser implementada antes de habilitar o botão.
+
+Os formulários de interesse dependem de /api/interesses, que não está implementada neste pacote. Não utilize para coletar dados pessoais.
+
+O arquivo ZIP deve ser extraído antes de enviar a pasta no fluxo de upload direto do Cloudflare Pages. Verifique se o método de implantação escolhido oferece suporte às Functions; se não, use Wrangler/Git.
