@@ -1,0 +1,84 @@
+
+name: Atualizar Imoveis Caixa Brasil
+
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+            - name: Baixar listas oficiais da Caixa
+        shell: bash
+        run: |
+          mkdir -p dados
+          for uf in AC AL AM AP BA CE DF ES GO MA MG MS MT PA PB PE PI PR RJ RN RO RR RS SC SE SP TO; do
+            curl --fail --location --retry 3 \
+              "https://venda-imoveis.caixa.gov.br/listaweb/Lista_imoveis_${uf}.csv" \
+              -o "dados/${uf}.csv" || exit 1
+          done
+
+      - name: Consolidar e publicar
+        env:
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          API_URL: ${{ vars.API_URL }}
+        shell: bash
+        run: |
+        python3 - <<'PY'
+         import os, csv, io, urllib.request
+          from pathlib import Path
+
+          arquivos = sorted(Path("dados").glob("*.csv"))
+          linhas = []
+          cabecalho = None
+
+          for arquivo in arquivos:
+              texto = arquivo.read_bytes().decode(
+                  "latin-1-sig"
+              )
+              leitor = csv.reader(
+                  io.StringIO(texto), delimiter=";"
+              )
+              dados = list(leitor)
+              if not dados:
+                  continue
+              if cabecalho is None:
+                  cabecalho = dados[0]
+              elif dados[0] != cabecalho:
+                  raise ValueError(
+                      f"Cabecalho diferente: {arquivo}"
+                  )
+              linhas.extend(dados[1:])
+
+          if not linhas:
+              raise ValueError("Nenhum imovel encontrado")
+
+          saida = io.StringIO()
+          escritor = csv.writer(
+              saida, delimiter=";", lineterminator="\n"
+          )
+          escritor.writerow(cabecalho)
+          escritor.writerows(linhas)
+
+          url = os.environ["API_URL"]
+          token = os.environ["ADMIN_TOKEN"]
+          req = urllib.request.Request(
+              url,
+              data=saida.getvalue().encode("utf-8"),
+              headers={
+                  "Authorization": f"Bearer {token}",
+                  "Content-Type": "text/csv",
+                  "X-CSV-Name": "Caixa_Brasil.csv"
+              },
+              method="PUT"
+          )
+          with urllib.request.urlopen(req) as resp:
+              print(resp.read().decode())
+          PY
