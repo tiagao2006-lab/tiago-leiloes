@@ -3,7 +3,7 @@ name: Atualizar Imoveis Caixa Brasil
 
 on:
   schedule:
-- cron: '0 12 * * *'
+    - cron: '0 12 * * *'
   workflow_dispatch:
 
 permissions:
@@ -12,10 +12,10 @@ permissions:
 jobs:
   atualizar:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
-            - name: Baixar listas oficiais da Caixa
+      - name: Baixar listas oficiais da Caixa
         shell: bash
         run: |
           mkdir -p dados
@@ -31,8 +31,11 @@ jobs:
           API_URL: ${{ vars.API_URL }}
         shell: bash
         run: |
-        python3 - <<'PY'
-         import os, csv, io, urllib.request
+          python3 - <<'PY'
+          import os
+          import csv
+          import io
+          import urllib.request
           from pathlib import Path
 
           arquivos = sorted(Path("dados").glob("*.csv"))
@@ -40,9 +43,7 @@ jobs:
           cabecalho = None
 
           for arquivo in arquivos:
-              texto = arquivo.read_bytes().decode(
-                  "latin-1-sig"
-              )
+              texto = arquivo.read_bytes().decode("latin-1-sig")
               leitor = csv.reader(
                   io.StringIO(texto), delimiter=";"
               )
@@ -69,6 +70,10 @@ jobs:
 
           url = os.environ["API_URL"]
           token = os.environ["ADMIN_TOKEN"]
+
+          if not url or not token:
+              raise ValueError("API_URL ou ADMIN_TOKEN ausente")
+
           req = urllib.request.Request(
               url,
               data=saida.getvalue().encode("utf-8"),
@@ -79,6 +84,7 @@ jobs:
               },
               method="PUT"
           )
-          with urllib.request.urlopen(req) as resp:
+
+          with urllib.request.urlopen(req, timeout=120) as resp:
               print(resp.read().decode())
           PY
