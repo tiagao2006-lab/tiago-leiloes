@@ -3,7 +3,7 @@ name: Atualizar Imoveis Caixa Brasil
 
 on:
   schedule:
-    - cron: '0 9 * * *'
+- cron: '0 12 * * *'
   workflow_dispatch:
 
 permissions:
