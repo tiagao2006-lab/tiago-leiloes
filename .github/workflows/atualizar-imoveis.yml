@@ -43,7 +43,7 @@ jobs:
           cabecalho = None
 
           for arquivo in arquivos:
-              texto = arquivo.read_bytes().decode("latin-1-sig")
+              texto = arquivo.read_bytes().decode("latin-1")
               leitor = csv.reader(
                   io.StringIO(texto), delimiter=";"
               )
