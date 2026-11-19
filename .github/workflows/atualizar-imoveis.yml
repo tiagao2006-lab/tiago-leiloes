@@ -19,11 +19,42 @@ jobs:
         shell: bash
         run: |
           mkdir -p dados
+          sucesso=0
+          falhas=0
+
           for uf in AC AL AM AP BA CE DF ES GO MA MG MS MT PA PB PE PI PR RJ RN RO RR RS SC SE SP TO; do
-            curl --fail --location --retry 3 \
+            echo "Baixando imóveis de ${uf}..."
+
+            if curl --fail --location --retry 3 \
+              --connect-timeout 20 \
+              --max-time 90 \
+              --user-agent "Mozilla/5.0" \
+              --header "Accept: text/csv,*/*" \
               "https://venda-imoveis.caixa.gov.br/listaweb/Lista_imoveis_${uf}.csv" \
-              -o "dados/${uf}.csv" || exit 1
+              -o "dados/${uf}.csv"; then
+
+              if [ -s "dados/${uf}.csv" ]; then
+                echo "Download concluído: ${uf}"
+                sucesso=$((sucesso + 1))
+              else
+                echo "Arquivo vazio: ${uf}"
+                rm -f "dados/${uf}.csv"
+                falhas=$((falhas + 1))
+              fi
+            else
+              echo "Falha no download: ${uf}"
+              rm -f "dados/${uf}.csv"
+              falhas=$((falhas + 1))
+            fi
           done
+
+          echo "Estados baixados: ${sucesso}"
+          echo "Estados com falha: ${falhas}"
+
+          if [ "$sucesso" -ne 27 ]; then
+            echo "::error::Atualização incompleta. Publicação cancelada."
+            exit 1
+          fi
 
       - name: Consolidar e publicar
         env:
@@ -42,49 +73,102 @@ jobs:
           linhas = []
           cabecalho = None
 
-          for arquivo in arquivos:
-              texto = arquivo.read_bytes().decode("latin-1")
-              leitor = csv.reader(
-                  io.StringIO(texto), delimiter=";"
+          if len(arquivos) != 27:
+              raise ValueError(
+                  "Esperados 27 arquivos estaduais"
               )
+
+          for arquivo in arquivos:
+              bruto = arquivo.read_bytes()
+
+              try:
+                  texto = bruto.decode("utf-8-sig")
+              except UnicodeDecodeError:
+                  texto = bruto.decode("latin-1")
+
+              leitor = csv.reader(
+                  io.StringIO(texto),
+                  delimiter=";"
+              )
+
               dados = list(leitor)
+
               if not dados:
-                  continue
+                  raise ValueError(
+                      f"Arquivo vazio: {arquivo}"
+                  )
+
               if cabecalho is None:
                   cabecalho = dados[0]
               elif dados[0] != cabecalho:
                   raise ValueError(
                       f"Cabecalho diferente: {arquivo}"
                   )
+
               linhas.extend(dados[1:])
 
           if not linhas:
-              raise ValueError("Nenhum imovel encontrado")
+              raise ValueError(
+                  "Nenhum imovel encontrado"
+              )
+
+          print(
+              f"Total de imoveis: {len(linhas)}"
+          )
 
           saida = io.StringIO()
           escritor = csv.writer(
-              saida, delimiter=";", lineterminator="\n"
+              saida,
+              delimiter=";",
+              lineterminator="\n"
           )
+
           escritor.writerow(cabecalho)
           escritor.writerows(linhas)
 
-          url = os.environ["API_URL"]
-          token = os.environ["ADMIN_TOKEN"]
+          url = os.environ.get(
+              "API_URL", ""
+          ).strip()
+
+          token = os.environ.get(
+              "ADMIN_TOKEN", ""
+          ).strip()
 
           if not url or not token:
-              raise ValueError("API_URL ou ADMIN_TOKEN ausente")
+              raise ValueError(
+                  "API_URL ou ADMIN_TOKEN ausente"
+              )
+
+          conteudo = saida.getvalue().encode(
+              "utf-8"
+          )
 
           req = urllib.request.Request(
               url,
-              data=saida.getvalue().encode("utf-8"),
+              data=conteudo,
               headers={
                   "Authorization": f"Bearer {token}",
-                  "Content-Type": "text/csv",
+                  "Content-Type": "text/csv; charset=utf-8",
                   "X-CSV-Name": "Caixa_Brasil.csv"
               },
               method="PUT"
           )
 
-          with urllib.request.urlopen(req, timeout=120) as resp:
-              print(resp.read().decode())
+          with urllib.request.urlopen(
+              req, timeout=120
+          ) as resp:
+              print(
+                  "Publicacao:",
+                  resp.status
+              )
+              print(
+                  resp.read().decode(
+                      "utf-8",
+                      errors="replace"
+                  )
+              )
+
+          print(
+              "Atualizacao concluida com sucesso!"
+          )
           PY
