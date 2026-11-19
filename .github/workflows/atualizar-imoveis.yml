@@ -3,6 +3,7 @@ name: Atualizar Imoveis Caixa Brasil
 
 on:
   schedule:
+    # Todos os dias as 09:00 de Brasilia (12:00 UTC)
     - cron: '0 12 * * *'
   workflow_dispatch:
 
@@ -23,9 +24,10 @@ jobs:
           falhas=0
 
           for uf in AC AL AM AP BA CE DF ES GO MA MG MS MT PA PB PE PI PR RJ RN RO RR RS SC SE SP TO; do
-            echo "Baixando imóveis de ${uf}..."
+            echo "Baixando imoveis de ${uf}..."
 
             if curl --fail --location --retry 3 \
+              --retry-delay 3 \
               --connect-timeout 20 \
               --max-time 90 \
               --user-agent "Mozilla/5.0" \
@@ -34,7 +36,7 @@ jobs:
               -o "dados/${uf}.csv"; then
 
               if [ -s "dados/${uf}.csv" ]; then
-                echo "Download concluído: ${uf}"
+                echo "Download concluido: ${uf}"
                 sucesso=$((sucesso + 1))
               else
                 echo "Arquivo vazio: ${uf}"
@@ -52,7 +54,7 @@ jobs:
           echo "Estados com falha: ${falhas}"
 
           if [ "$sucesso" -ne 27 ]; then
-            echo "::error::Atualização incompleta. Publicação cancelada."
+            echo "::error::Atualizacao incompleta. Publicacao cancelada."
             exit 1
           fi
 
@@ -66,81 +68,145 @@ jobs:
           import os
           import csv
           import io
+          import re
+          import unicodedata
           import urllib.request
           from pathlib import Path
 
-          arquivos = sorted(Path("dados").glob("*.csv"))
-          linhas = []
-          cabecalho = None
+          UFS = (
+              "AC AL AM AP BA CE DF ES GO MA MG MS MT "
+              "PA PB PE PI PR RJ RN RO RR RS SC SE SP TO"
+          ).split()
 
-          if len(arquivos) != 27:
-              raise ValueError(
-                  "Esperados 27 arquivos estaduais"
+          def normalizar(valor):
+              valor = valor.replace("\ufeff", "").strip()
+              valor = unicodedata.normalize("NFKD", valor)
+              valor = "".join(
+                  c for c in valor
+                  if not unicodedata.combining(c)
               )
+              valor = valor.upper()
+              valor = re.sub(r"\s+", " ", valor)
+              return valor
 
-          for arquivo in arquivos:
-              bruto = arquivo.read_bytes()
+          def decodificar(bruto):
+              for encoding in ("utf-8-sig", "cp1252"):
+                  try:
+                      return bruto.decode(encoding)
+                  except UnicodeDecodeError:
+                      continue
+              raise ValueError("Codificacao nao reconhecida")
 
-              try:
-                  texto = bruto.decode("utf-8-sig")
-              except UnicodeDecodeError:
-                  texto = bruto.decode("latin-1")
+          arquivos = [
+              Path("dados") / f"{uf}.csv"
+              for uf in UFS
+          ]
+
+          if not all(p.is_file() for p in arquivos):
+              raise ValueError("Faltam arquivos estaduais")
+
+          cabecalho_final = []
+          nomes_colunas = set()
+          registros = []
+          totais = {}
+
+          for uf, arquivo in zip(UFS, arquivos):
+              texto = decodificar(arquivo.read_bytes())
+
+              if not texto.strip():
+                  raise ValueError(f"Arquivo vazio: {uf}")
 
               leitor = csv.reader(
                   io.StringIO(texto),
                   delimiter=";"
               )
 
-              dados = list(leitor)
+              dados = iter(leitor)
 
-              if not dados:
+              try:
+                  cabecalho_original = next(dados)
+              except StopIteration:
+                  raise ValueError(f"Sem cabecalho: {uf}")
+
+              cabecalho = [
+                  normalizar(c)
+                  for c in cabecalho_original
+              ]
+
+              if not all(cabecalho):
                   raise ValueError(
-                      f"Arquivo vazio: {arquivo}"
+                      f"Coluna sem nome: {uf}"
                   )
 
-              if cabecalho is None:
-                  cabecalho = dados[0]
-              elif dados[0] != cabecalho:
+              if len(set(cabecalho)) != len(cabecalho):
                   raise ValueError(
-                      f"Cabecalho diferente: {arquivo}"
+                      f"Colunas duplicadas: {uf}"
                   )
 
-              linhas.extend(dados[1:])
+              for coluna in cabecalho:
+                  if coluna not in nomes_colunas:
+                      nomes_colunas.add(coluna)
+                      cabecalho_final.append(coluna)
 
-          if not linhas:
-              raise ValueError(
-                  "Nenhum imovel encontrado"
-              )
+              quantidade = 0
 
-          print(
-              f"Total de imoveis: {len(linhas)}"
-          )
+              for numero, linha in enumerate(dados, start=2):
+                  if not linha or not any(
+                      valor.strip() for valor in linha
+                  ):
+                      continue
+
+                  if len(linha) != len(cabecalho):
+                      raise ValueError(
+                          f"{uf}, linha {numero}: "
+                          f"{len(linha)} campos; "
+                          f"esperados {len(cabecalho)}"
+                      )
+
+                  registro = dict(zip(cabecalho, linha))
+                  registros.append(registro)
+                  quantidade += 1
+
+              if quantidade == 0:
+                  raise ValueError(
+                      f"Nenhum imovel encontrado em {uf}"
+                  )
+
+              totais[uf] = quantidade
+              print(f"{uf}: {quantidade} imoveis")
+
+          if not registros:
+              raise ValueError("Nenhum imovel encontrado")
+
+          print("Total de imoveis:", len(registros))
+          print("Total de colunas:", len(cabecalho_final))
 
           saida = io.StringIO()
-          escritor = csv.writer(
+          escritor = csv.DictWriter(
               saida,
+              fieldnames=cabecalho_final,
               delimiter=";",
-              lineterminator="\n"
+              lineterminator="\n",
+              extrasaction="raise"
           )
 
-          escritor.writerow(cabecalho)
-          escritor.writerows(linhas)
+          escritor.writeheader()
+          escritor.writerows(registros)
 
-          url = os.environ.get(
-              "API_URL", ""
-          ).strip()
-
-          token = os.environ.get(
-              "ADMIN_TOKEN", ""
-          ).strip()
+          url = os.environ.get("API_URL", "").strip()
+          token = os.environ.get("ADMIN_TOKEN", "").strip()
 
           if not url or not token:
               raise ValueError(
                   "API_URL ou ADMIN_TOKEN ausente"
               )
 
-          conteudo = saida.getvalue().encode(
-              "utf-8"
+          conteudo = saida.getvalue().encode("utf-8")
+
+          print(
+              "Tamanho do CSV:",
+              len(conteudo),
+              "bytes"
           )
 
           req = urllib.request.Request(
@@ -157,10 +223,7 @@ jobs:
           with urllib.request.urlopen(
               req, timeout=120
           ) as resp:
-              print(
-                  "Publicacao:",
-                  resp.status
-              )
+              print("Publicacao HTTP:", resp.status)
               print(
                   resp.read().decode(
                       "utf-8",
@@ -168,7 +231,5 @@ jobs:
                   )
               )
 
-          print(
-              "Atualizacao concluida com sucesso!"
-          )
+          print("ATUALIZACAO CONCLUIDA COM SUCESSO!")
           PY
