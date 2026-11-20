@@ -127,9 +127,32 @@ const optionValue = (item, field) => item[field] || missing;
 function fillSelect(field, items, title) {
   const select = $(field);
   const previous = select.value;
-  const options = [...new Set(items.map(item => optionValue(item, field)))].sort((a,b) => a.localeCompare(b, 'pt-BR'));
-  select.replaceChildren(new Option(title, ''), ...options.map(option => new Option(option, option)));
-  if (options.includes(previous)) select.value = previous;
+
+  const counts = new Map();
+
+  for (const item of items) {
+    const value = optionValue(item, field);
+    if (!value) continue;
+    counts.set(value, (counts.get(value) || 0) + 1);
+  }
+
+  const options = [...counts.keys()].sort((a, b) =>
+    a.localeCompare(b, 'pt-BR')
+  );
+
+  select.replaceChildren(
+    new Option(`${title} (${items.length.toLocaleString('pt-BR')})`, ''),
+    ...options.map(value =>
+      new Option(
+        `${value} (${counts.get(value).toLocaleString('pt-BR')})`,
+        value
+      )
+    )
+  );
+
+  if (options.includes(previous)) {
+    select.value = previous;
+  }
 }
 
 const selectedDistricts = new Set();
