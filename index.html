@@ -40,6 +40,32 @@ dialog{width:min(440px,calc(100% - 32px));border:1px solid var(--line);border-ra
 @media(max-width:460px){.lead-grid{grid-template-columns:1fr}#interestDialog,#leadsDialog{padding:15px}}
 /* Mapa interativo */
 .map-toolbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap}.map-panel{margin-bottom:18px;overflow:hidden}.map-top{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.map-help{padding:0 18px 12px;color:var(--muted);font-size:13px}.map-layout{display:grid;grid-template-columns:minmax(0,1fr) 310px;border-top:1px solid var(--line)}#propertyMap{height:500px;min-height:350px;background:#e8eef6}.map-list{height:500px;overflow:auto;border-left:1px solid var(--line)}.map-card{padding:12px 14px;border-bottom:1px solid var(--line)}.map-card strong{display:block}.map-card small{display:block;color:var(--muted)}.map-card-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.map-card-actions button,.map-card-actions a{font-size:12px}.map-pin{background:#0756a6;border:3px solid white;border-radius:50%;width:19px;height:19px;box-shadow:0 1px 6px #0006}.map-notice{padding:10px 18px;color:var(--muted)}@media(max-width:800px){.map-layout{grid-template-columns:1fr}#propertyMap{height:350px}.map-list{height:300px;border-left:0;border-top:1px solid var(--line)}}
+
+/* Proteção visual caso o CSS externo do Leaflet não seja carregado corretamente. */
+#propertyMap{position:relative;overflow:hidden;isolation:isolate;width:100%;min-width:0}
+#propertyMap .leaflet-pane,#propertyMap .leaflet-tile,#propertyMap .leaflet-marker-icon,#propertyMap .leaflet-marker-shadow,#propertyMap .leaflet-tile-container,#propertyMap .leaflet-pane>svg,#propertyMap .leaflet-pane>canvas{position:absolute;left:0;top:0}
+#propertyMap .leaflet-map-pane,#propertyMap .leaflet-pane,#propertyMap .leaflet-control-container{position:absolute;left:0;top:0;width:100%;height:100%}
+#propertyMap .leaflet-tile{width:256px;height:256px;max-width:none!important;max-height:none!important;border:0}
+#propertyMap .leaflet-tile-container{pointer-events:none}
+#propertyMap .leaflet-control-container{pointer-events:none}
+#propertyMap .leaflet-control{pointer-events:auto}
+#propertyMap .leaflet-control-zoom{position:absolute;top:10px;left:10px;z-index:1000}
+#propertyMap .leaflet-control-attribution{position:absolute;right:0;bottom:0;z-index:1000;background:#ffffffcf;font-size:11px;padding:1px 5px}
+#propertyMap .leaflet-popup-pane{z-index:700}
+#propertyMap .leaflet-marker-pane{z-index:600}
+#propertyMap .leaflet-overlay-pane{z-index:400}
+#propertyMap .leaflet-tile-pane{z-index:200}
+#propertyMap .leaflet-shadow-pane{z-index:500}
+#propertyMap .leaflet-tooltip-pane{z-index:650}
+#propertyMap .leaflet-control-container{z-index:800}
+#propertyMap .leaflet-container{background:#e8eef6}
+.map-layout{min-width:0}.map-layout>*{min-width:0}
+.geo-actions{display:flex;flex-wrap:wrap;gap:8px}.geo-status{padding:0 18px 12px;color:var(--muted);font-size:13px}.geo-status:empty{display:none}
+/* Pin azul no formato de gota, inspirado no modelo enviado. */
+.caixa-pin-icon{background:transparent;border:0}
+.caixa-pin-shape{position:relative;display:block;width:29px;height:29px;background:linear-gradient(145deg,#39b9ff 0%,#0768e8 55%,#0033aa 100%);border:2px solid #fff;border-radius:55% 55% 55% 5%;transform:rotate(-45deg);box-shadow:-2px 3px 7px #001e5680}
+.caixa-pin-shape::after{content:"";position:absolute;width:10px;height:10px;left:8px;top:8px;border-radius:50%;background:#fff;box-shadow:inset 0 1px 3px #2358a055}
+.caixa-pin-icon:hover .caixa-pin-shape{filter:brightness(1.12)}
 </style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoaNc8TLnDEbiOf0=" crossorigin="">
 </head>
@@ -57,7 +83,7 @@ dialog{width:min(440px,calc(100% - 32px));border:1px solid var(--line);border-ra
 <div class="metric"><span>Maior desconto sobre avaliação</span><strong id="highest">—</strong></div>
 </section>
 <section class="panel filters" aria-labelledby="filter-title">
-<div class="bar"><h2 id="filter-title">Filtros</h2><button type="button" id="clear">Limpar filtros</button></div>
+<div class="bar"><h2 id="filter-title">Filtros</h2><div class="geo-actions"><button type="button" id="nearMe">📍 Imóveis perto de mim</button><button type="button" id="allBrazil">🌎 Ver todo o Brasil</button><button type="button" id="clear">Limpar filtros</button></div></div><div id="geoStatus" class="geo-status" role="status" aria-live="polite">Você pode permitir a localização para ver imóveis da sua cidade.</div>
 <form class="grid" id="filters">
 <label>UF<select id="uf"></select></label><label>Cidade<select id="city"></select></label><div class="district-filter"><span id="district-label">Bairro</span><details id="district-picker">
 <summary id="district-summary" aria-labelledby="district-label district-summary">Todos os bairros</summary>
@@ -130,6 +156,9 @@ function discountNumber(value) {
 
 let base, matches = [], page = 1;
 let previousPrices = new Map();
+let visitorRegion = null;
+let geoRequestedAutomatically = false;
+let geoInProgress = false;
 const missing = 'Não informado';
 const optionValue = (item, field) => item[field] || missing;
 function fillSelect(field, items, title) {
@@ -214,8 +243,95 @@ function useBase(next) {
   fillSelect('finance', base.items, 'Todos');
   if (firstLoad) $('filters').reset();
   updateLocations();
+  if (visitorRegion) applyVisitorRegion(visitorRegion);
   applyFilters({keepPage:true});
+  if (firstLoad && !geoRequestedAutomatically) {
+    geoRequestedAutomatically = true;
+    // A permissão é controlada pelo navegador; se a solicitação automática
+    // for bloqueada, o botão 'Imóveis perto de mim' continua disponível.
+    requestVisitorLocation(true);
+  }
 }
+
+// Geolocalização opcional: coordenadas são usadas apenas para identificar a cidade.
+// Não são enviadas para a API de imóveis nem salvas no armazenamento do site.
+const geoStatus = message => { $('geoStatus').textContent = message; };
+function findAvailableOption(select, wanted) {
+  const target = normalize(String(wanted || '').trim());
+  return [...select.options].find(option => option.value && normalize(option.value) === target)?.value || '';
+}
+function applyVisitorRegion(region) {
+  if (!base || !region) return;
+  const uf = findAvailableOption($('uf'), region.uf);
+  if (!uf) {
+    geoStatus('Sua UF não está disponível na lista atual. Exibindo todo o Brasil.');
+    return;
+  }
+  $('uf').value = uf;
+  $('city').value = '';
+  selectedDistricts.clear();
+  updateLocations();
+  const city = findAvailableOption($('city'), region.city);
+  if (city) {
+    $('city').value = city;
+    updateLocations();
+    geoStatus('📍 Exibindo imóveis em ' + city + ' - ' + uf + '. Você pode alterar os filtros ou ver todo o Brasil.');
+  } else {
+    geoStatus('📍 Não há imóveis cadastrados para ' + (region.city || 'sua cidade') + ' na lista atual. Exibindo imóveis de ' + uf + '.');
+  }
+  applyFilters();
+}
+async function requestVisitorLocation(automatic = false) {
+  if (geoInProgress) return;
+  if (!navigator.geolocation || !window.isSecureContext) {
+    if (!automatic) geoStatus('Localização indisponível neste navegador. Acesse o site por HTTPS e escolha UF e cidade manualmente.');
+    return;
+  }
+  geoInProgress = true;
+  $('nearMe').disabled = true;
+  geoStatus('Aguardando autorização para identificar sua região…');
+  try {
+    const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy:false, timeout:12000, maximumAge:600000
+    }));
+    const {latitude, longitude} = position.coords;
+    geoStatus('Localização autorizada. Identificando cidade e UF…');
+    const params = new URLSearchParams({format:'jsonv2',lat:String(latitude),lon:String(longitude),zoom:'10',addressdetails:'1', 'accept-language':'pt-BR'});
+    const response = await fetch('https://nominatim.openstreetmap.org/reverse?' + params, {headers:{Accept:'application/json'}});
+    if (!response.ok) throw Error('Não foi possível identificar sua cidade agora. Selecione UF e cidade manualmente.');
+    const result = await response.json();
+    const a = result.address || {};
+    const city = a.city || a.town || a.municipality || a.village || a.city_district || '';
+    const stateCode = (a['ISO3166-2-lvl4'] || a['ISO3166-2-lvl3'] || '').split('-').pop().toUpperCase();
+    const ufByName = {'acre':'AC','alagoas':'AL','amapa':'AP','amazonas':'AM','bahia':'BA','ceara':'CE','distrito federal':'DF','espirito santo':'ES','goias':'GO','maranhao':'MA','mato grosso':'MT','mato grosso do sul':'MS','minas gerais':'MG','para':'PA','paraiba':'PB','parana':'PR','pernambuco':'PE','piaui':'PI','rio de janeiro':'RJ','rio grande do norte':'RN','rio grande do sul':'RS','rondonia':'RO','roraima':'RR','santa catarina':'SC','sao paulo':'SP','sergipe':'SE','tocantins':'TO'};
+    const uf = /^[A-Z]{2}$/.test(stateCode) && stateCode !== 'BR' ? stateCode : ufByName[normalize(a.state || '')];
+    if (!uf) throw Error('Não foi possível identificar a UF. Escolha a região nos filtros.');
+    visitorRegion = {uf, city};
+    if (base) applyVisitorRegion(visitorRegion);
+    else geoStatus('Região identificada. Aguardando o carregamento dos imóveis…');
+    if (propertyMap) {
+      propertyMap.setView([latitude, longitude], 11);
+      propertyMap.invalidateSize();
+    }
+  } catch (error) {
+    if (error?.code === 1) geoStatus('Localização não autorizada. Você pode continuar pesquisando em todo o Brasil.');
+    else if (error?.code === 2) geoStatus('Localização indisponível. Escolha sua cidade nos filtros.');
+    else if (error?.code === 3) geoStatus('Tempo esgotado ao buscar localização. Tente novamente pelo botão.');
+    else geoStatus(error.message || 'Não foi possível identificar sua localização.');
+  } finally {
+    geoInProgress = false;
+    $('nearMe').disabled = false;
+  }
+}
+$('nearMe').addEventListener('click', () => requestVisitorLocation(false));
+$('allBrazil').addEventListener('click', () => {
+  visitorRegion = null;
+  selectedDistricts.clear();
+  $('filters').reset();
+  if (base) { updateLocations(); applyFilters(); }
+  geoStatus('🌎 Exibindo imóveis de todo o Brasil. Você pode filtrar qualquer região.');
+  if (propertyMap) propertyMap.setView([-14.235, -51.925], 4);
+});
 
 const sorters = {discount:(a,b) => b.discount-a.discount, price:(a,b) => a.price-b.price, valuation:(a,b) => b.valuation-a.valuation};
 function applyFilters({keepPage = false} = {}) {
@@ -309,41 +425,61 @@ function makeRow(item) {
 let propertyMap = null;
 let mapMarker = null;
 let geocodeBusy = false;
+let mapResizeObserver = null;
 const geoCache = new Map();
 const mapMessage = message => { $('mapNotice').textContent = message; };
 function initPropertyMap() {
-  if (propertyMap) { setTimeout(() => propertyMap.invalidateSize(), 50); return true; }
+  if (propertyMap) { requestAnimationFrame(() => propertyMap.invalidateSize({pan:false})); return true; }
   if (typeof L === 'undefined') { mapMessage('Não foi possível carregar o mapa. Verifique a conexão e recarregue a página.'); return false; }
   propertyMap = L.map('propertyMap').setView([-14.235,-51.925],4);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom:19, attribution:'&copy; OpenStreetMap contributors'
   }).addTo(propertyMap);
-  setTimeout(() => propertyMap.invalidateSize(), 50);
+  mapResizeObserver = new ResizeObserver(() => {
+    if (!$('mapPanel').hidden) propertyMap.invalidateSize({pan:false});
+  });
+  mapResizeObserver.observe($('propertyMap'));
+  requestAnimationFrame(() => propertyMap.invalidateSize({pan:false}));
+  setTimeout(() => propertyMap.invalidateSize({pan:false}), 250);
   return true;
 }
 function showPin(lat, lon, title, exact) {
   if (!propertyMap) return;
   if (mapMarker) propertyMap.removeLayer(mapMarker);
-  mapMarker = L.marker([lat,lon]).addTo(propertyMap).bindPopup(title).openPopup();
+  const bluePin = L.divIcon({className:'caixa-pin-icon',html:'<span class="caixa-pin-shape" aria-hidden="true"></span>',iconSize:[32,40],iconAnchor:[16,38],popupAnchor:[0,-36]});
+  mapMarker = L.marker([lat,lon],{icon:bluePin,title:String(title)}).addTo(propertyMap);
+  const popupText = document.createElement('span'); popupText.textContent = title;
+  mapMarker.bindPopup(popupText).openPopup();
   propertyMap.setView([lat,lon], exact ? 16 : 12);
 }
-async function locateOnMap(query, label, exact) {
+async function searchMapLocation(query) {
+  if (geoCache.has(query)) return geoCache.get(query);
+  const params = new URLSearchParams({format:'jsonv2',limit:'3',countrycodes:'br',addressdetails:'1',q:query});
+  const response = await fetch('https://nominatim.openstreetmap.org/search?' + params, {headers:{Accept:'application/json'}});
+  if (!response.ok) throw Error('Serviço de localização indisponível. Tente novamente mais tarde.');
+  const found = await response.json();
+  const result = found.find(entry => Number.isFinite(Number(entry.lat)) && Number.isFinite(Number(entry.lon))) || null;
+  geoCache.set(query,result);
+  return result;
+}
+async function locateOnMap(query, label, exact, item = null) {
   if (geocodeBusy) { mapMessage('Aguarde a localização anterior terminar.'); return; }
   if (!initPropertyMap()) return;
   geocodeBusy = true;
   mapMessage('Procurando: ' + label + '...');
   try {
-    let result = geoCache.get(query);
-    if (!result) {
-      const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=br&q=' + encodeURIComponent(query);
-      const response = await fetch(url, {headers:{'Accept':'application/json'}});
-      if (!response.ok) throw Error('Serviço de localização indisponível.');
-      const found = await response.json();
-      if (!found.length) throw Error('Endereço não localizado. Confira o endereço na Caixa.');
-      result = found[0]; geoCache.set(query, result);
+    let result = await searchMapLocation(query);
+    let approximate = !exact;
+    if (!result && item?.city && item?.uf) {
+      mapMessage('Endereço completo não encontrado. Procurando a cidade...');
+      result = await searchMapLocation([item.city,item.uf,'Brasil'].join(', '));
+      approximate = true;
     }
-    showPin(Number(result.lat), Number(result.lon), label, exact);
-    mapMessage(exact ? 'Localização sugerida pelo serviço de mapas; confira a posição exata antes de visitar o imóvel.' : 'Marcador da cidade, não do endereço específico do imóvel.');
+    if (!result) throw Error('Localização não encontrada. Confira o endereço na página oficial da Caixa.');
+    const popupLabel = approximate ? 'Região aproximada de ' + (item?.city || label) + ' — não indica a posição do imóvel' : label + ' — posição sugerida, não confirmada';
+    showPin(Number(result.lat),Number(result.lon),popupLabel,!approximate);
+    propertyMap.invalidateSize({pan:false});
+    mapMessage(approximate ? 'Localização aproximada da cidade. O marcador NÃO indica o endereço do imóvel.' : 'Endereço sugerido pelo mapa, sem confirmação. Confira a localização antes de visitar.');
   } catch (error) { mapMessage(error.message || 'Falha ao localizar endereço.'); }
   finally { geocodeBusy = false; }
 }
@@ -359,7 +495,7 @@ function renderMapCards() {
     const discount = document.createElement('small'); discount.textContent = 'Desconto: ' + percent.format(item.discount/100) + ' · Imóvel ' + item.id;
     const actions = document.createElement('div'); actions.className = 'map-card-actions';
     const locate = document.createElement('button'); locate.type='button'; locate.textContent='📍 Localizar endereço';
-    locate.addEventListener('click', () => locateOnMap([item.address,item.city,item.uf,'Brasil'].filter(Boolean).join(', '), 'Imóvel ' + item.id + ' — ' + item.address, true));
+    locate.addEventListener('click', () => locateOnMap([item.address,item.district,item.city,item.uf,'Brasil'].filter(Boolean).join(', '), 'Imóvel ' + item.id + ' — ' + item.address, true, item));
     const official = document.createElement('a'); official.className='link'; official.textContent='Ver na Caixa'; official.href=item.url; official.target='_blank'; official.rel='noopener noreferrer';
     actions.append(locate,makeInterestButton(item),official);
     card.append(title,addr,discount,actions);container.append(card);
@@ -373,6 +509,8 @@ $('toggleMap').addEventListener('click', () => {
   $('mapPanel').hidden = false;
   $('toggleMap').textContent = '🗺️ Mapa aberto';
   initPropertyMap(); renderMapCards();
+  requestAnimationFrame(() => propertyMap?.invalidateSize({pan:false}));
+  setTimeout(() => propertyMap?.invalidateSize({pan:false}), 300);
   $('mapPanel').scrollIntoView({behavior:'smooth',block:'start'});
 });
 $('closeMap').addEventListener('click', () => {
@@ -406,6 +544,7 @@ $('filters').addEventListener('input', event => {
     updateDistrictSummary();
   }
   if (event.target.id === 'uf' || event.target.id === 'city') {
+    visitorRegion = null;
     selectedDistricts.clear();
     if (event.target.id === 'uf') $('city').value = '';
     updateLocations();
@@ -433,6 +572,8 @@ $('clear-districts').addEventListener('click', () => {
   $('district-summary').focus();
 });
 $('clear').addEventListener('click', () => {
+  visitorRegion = null;
+  geoStatus('Filtros limpos. Exibindo imóveis de todo o Brasil.');
   selectedDistricts.clear();
   for (const field of ['uf','city','mode','finance']) $(field).value = '';
   $('filters').reset();
