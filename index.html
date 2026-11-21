@@ -41,26 +41,22 @@ dialog{width:min(440px,calc(100% - 32px));border:1px solid var(--line);border-ra
 /* Mapa interativo */
 .map-toolbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap}.map-panel{margin-bottom:18px;overflow:hidden}.map-top{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.map-help{padding:0 18px 12px;color:var(--muted);font-size:13px}.map-layout{display:grid;grid-template-columns:minmax(0,1fr) 310px;border-top:1px solid var(--line)}#propertyMap{height:500px;min-height:350px;background:#e8eef6}.map-list{height:500px;overflow:auto;border-left:1px solid var(--line)}.map-card{padding:12px 14px;border-bottom:1px solid var(--line)}.map-card strong{display:block}.map-card small{display:block;color:var(--muted)}.map-card-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.map-card-actions button,.map-card-actions a{font-size:12px}.map-pin{background:#0756a6;border:3px solid white;border-radius:50%;width:19px;height:19px;box-shadow:0 1px 6px #0006}.map-notice{padding:10px 18px;color:var(--muted)}@media(max-width:800px){.map-layout{grid-template-columns:1fr}#propertyMap{height:350px}.map-list{height:300px;border-left:0;border-top:1px solid var(--line)}}
 
-/* Proteção visual caso o CSS externo do Leaflet não seja carregado corretamente. */
-#propertyMap{position:relative;overflow:hidden;isolation:isolate;width:100%;min-width:0}
-#propertyMap .leaflet-pane,#propertyMap .leaflet-tile,#propertyMap .leaflet-marker-icon,#propertyMap .leaflet-marker-shadow,#propertyMap .leaflet-tile-container,#propertyMap .leaflet-pane>svg,#propertyMap .leaflet-pane>canvas{position:absolute;left:0;top:0}
-#propertyMap .leaflet-map-pane,#propertyMap .leaflet-pane,#propertyMap .leaflet-control-container{position:absolute;left:0;top:0;width:100%;height:100%}
-#propertyMap .leaflet-tile{width:256px;height:256px;max-width:none!important;max-height:none!important;border:0}
-#propertyMap .leaflet-tile-container{pointer-events:none}
-#propertyMap .leaflet-control-container{pointer-events:none}
-#propertyMap .leaflet-control{pointer-events:auto}
-#propertyMap .leaflet-control-zoom{position:absolute;top:10px;left:10px;z-index:1000}
-#propertyMap .leaflet-control-attribution{position:absolute;right:0;bottom:0;z-index:1000;background:#ffffffcf;font-size:11px;padding:1px 5px}
-#propertyMap .leaflet-popup-pane{z-index:700}
-#propertyMap .leaflet-marker-pane{z-index:600}
-#propertyMap .leaflet-overlay-pane{z-index:400}
-#propertyMap .leaflet-tile-pane{z-index:200}
-#propertyMap .leaflet-shadow-pane{z-index:500}
-#propertyMap .leaflet-tooltip-pane{z-index:650}
-#propertyMap .leaflet-control-container{z-index:800}
-#propertyMap .leaflet-container{background:#e8eef6}
 .map-layout{min-width:0}.map-layout>*{min-width:0}
 .geo-actions{display:flex;flex-wrap:wrap;gap:8px}.geo-status{padding:0 18px 12px;color:var(--muted);font-size:13px}.geo-status:empty{display:none}
+/* Vista enxuta, com pinos individuais e agrupamento local sem bibliotecas extras. */
+.map-top{background:linear-gradient(120deg,#ffffff,#f5f8ff)}
+.map-help{line-height:1.5}
+.map-statusbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:8px 18px;background:#f5f8ff;border-top:1px solid var(--line);font-size:13px}
+.map-statusbar small{font-size:12px;color:var(--muted)}
+.map-pin-count{font-weight:750;color:#124bba}
+.map-card{transition:background .15s}.map-card:hover{background:#f7faff}
+.map-card strong{font-size:16px;color:#0b3e9d}.map-card small{line-height:1.55;margin-top:3px}
+.map-card-actions .link,.map-card-actions button{padding:7px 9px}
+#mapNotice{min-height:38px}
+.geo-cluster-icon{background:transparent;border:0}
+.geo-cluster-bubble{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:#074ace;color:#fff;border:3px solid #fff;box-shadow:0 2px 8px #002f7b66;font-weight:800;font-size:13px}
+.caixa-pin-icon{will-change:transform}
+@media(max-width:800px){.map-top{align-items:start}.map-toolbar{width:100%}#propertyMap{height:390px}.map-statusbar{align-items:flex-start}}
 /* Pin azul no formato de gota, inspirado no modelo enviado. */
 .caixa-pin-icon{background:transparent;border:0}
 .caixa-pin-shape{position:relative;display:block;width:29px;height:29px;background:linear-gradient(145deg,#39b9ff 0%,#0768e8 55%,#0033aa 100%);border:2px solid #fff;border-radius:55% 55% 55% 5%;transform:rotate(-45deg);box-shadow:-2px 3px 7px #001e5680}
@@ -97,8 +93,9 @@ dialog{width:min(440px,calc(100% - 32px));border:1px solid var(--line);border-ra
 </form>
 </section>
 <section class="panel map-panel" id="mapPanel" hidden aria-labelledby="mapTitle">
-<div class="map-top"><h2 id="mapTitle">🗺️ Mapa dos imóveis</h2><div class="map-toolbar"><button type="button" id="mapCity">Localizar cidade selecionada</button><button type="button" id="closeMap">Fechar mapa</button></div></div>
-<div class="map-help">Selecione uma UF e uma cidade nos filtros. O mapa mostra a região pesquisada; use “Localizar endereço” em um imóvel para solicitar sua posição. A localização depende da qualidade do endereço fornecido pela Caixa.</div>
+<div class="map-top"><h2 id="mapTitle">🗺️ Mapa dos imóveis</h2><div class="map-toolbar"><button type="button" id="loadMapPins">📍 Mostrar mais imóveis no mapa</button><button type="button" id="mapCity">Localizar cidade selecionada</button><button type="button" id="closeMap">Fechar mapa</button></div></div>
+<div class="map-help">Selecione uma UF e uma cidade nos filtros. Pins azuis mostram imóveis com endereço identificado. Para carregar mais, clique em “Mostrar mais imóveis no mapa”. Posições na rua são aproximadas e precisam ser conferidas na Caixa.</div>
+<div class="map-statusbar"><span class="map-pin-count" id="mappedCount">0 imóveis localizados no mapa</span><small>Endereço exato somente quando confirmado · <a href="https://www.geoapify.com/" target="_blank" rel="noopener noreferrer">Geocodificação Geoapify</a></small></div>
 <div class="map-layout"><div id="propertyMap" aria-label="Mapa interativo de imóveis"></div><div class="map-list" id="mapList"></div></div><div id="mapNotice" class="map-notice" role="status"></div>
 </section>
 <section class="panel results" aria-labelledby="result-title">
@@ -421,105 +418,212 @@ function makeRow(item) {
 }
 
 
-// Mapa: geocodificação apenas quando o visitante solicita; não consulta a base nacional em lote.
+// Mapa leve: carrega apenas a cidade filtrada. Coordenadas confirmadas ficam em cache no KV.
+// A rota /api/coordenadas consulta provedora com chave no servidor; nunca no HTML.
 let propertyMap = null;
 let mapMarker = null;
-let geocodeBusy = false;
+let propertyPinsLayer = null;
 let mapResizeObserver = null;
+let mapPinsToken = 0;
+let mapPinsBusy = false;
 const geoCache = new Map();
+const propertyPinData = new Map();
 const mapMessage = message => { $('mapNotice').textContent = message; };
+const bluePin = () => L.divIcon({className:'caixa-pin-icon',html:'<span class="caixa-pin-shape" aria-hidden="true"></span>',iconSize:[32,40],iconAnchor:[16,38],popupAnchor:[0,-36]});
+
 function initPropertyMap() {
   if (propertyMap) { requestAnimationFrame(() => propertyMap.invalidateSize({pan:false})); return true; }
-  if (typeof L === 'undefined') { mapMessage('Não foi possível carregar o mapa. Verifique a conexão e recarregue a página.'); return false; }
-  propertyMap = L.map('propertyMap').setView([-14.235,-51.925],4);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom:19, attribution:'&copy; OpenStreetMap contributors'
+  if (typeof L === 'undefined') {
+    mapMessage('Não foi possível carregar Leaflet. Verifique a conexão e atualize a página.');
+    return false;
+  }
+  propertyMap = L.map('propertyMap',{preferCanvas:true,zoomControl:true,worldCopyJump:false,zoomSnap:1}).setView([-14.235,-51.925],4);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom:18,minZoom:3,keepBuffer:1,updateWhenIdle:true,attribution:'&copy; OpenStreetMap contributors'
   }).addTo(propertyMap);
+  propertyPinsLayer = L.layerGroup().addTo(propertyMap);
+  propertyMap.on('zoomend', refreshVisiblePins);
   mapResizeObserver = new ResizeObserver(() => {
-    if (!$('mapPanel').hidden) propertyMap.invalidateSize({pan:false});
+    if (!$('mapPanel').hidden) requestAnimationFrame(() => propertyMap.invalidateSize({pan:false}));
   });
   mapResizeObserver.observe($('propertyMap'));
   requestAnimationFrame(() => propertyMap.invalidateSize({pan:false}));
-  setTimeout(() => propertyMap.invalidateSize({pan:false}), 250);
   return true;
 }
-function showPin(lat, lon, title, exact) {
-  if (!propertyMap) return;
-  if (mapMarker) propertyMap.removeLayer(mapMarker);
-  const bluePin = L.divIcon({className:'caixa-pin-icon',html:'<span class="caixa-pin-shape" aria-hidden="true"></span>',iconSize:[32,40],iconAnchor:[16,38],popupAnchor:[0,-36]});
-  mapMarker = L.marker([lat,lon],{icon:bluePin,title:String(title)}).addTo(propertyMap);
-  const popupText = document.createElement('span'); popupText.textContent = title;
-  mapMarker.bindPopup(popupText).openPopup();
-  propertyMap.setView([lat,lon], exact ? 16 : 12);
+function currentPinItems() {
+  const visible = new Set(matches.map(item => String(item.id)));
+  return [...propertyPinData.values()].filter(entry => visible.has(String(entry.item.id)));
+}
+function makePopup(item, location) {
+  const box = document.createElement('div');box.style.cssText='min-width:180px;max-width:250px;line-height:1.4';
+  const price = document.createElement('strong');price.textContent=currency.format(item.price);price.style.cssText='font-size:16px;color:#0033aa';
+  const address=document.createElement('div');address.textContent=[item.address,item.district,item.city,item.uf].filter(Boolean).join(' · ');
+  const status=document.createElement('small');status.textContent=location.precision==='building'?'Localização estimada do imóvel · confirme na Caixa':'Posição aproximada da rua, não do imóvel';status.style.cssText='color:#62594e;display:block;margin:6px 0';
+  const savings=document.createElement('div');savings.textContent='Desconto: '+percent.format(item.discount/100);
+  const actions=document.createElement('div');actions.style.cssText='display:flex;gap:6px;flex-wrap:wrap;margin-top:9px';
+  const official=document.createElement('a');official.className='link';official.textContent='Ver na Caixa ↗';official.href=item.url;official.target='_blank';official.rel='noopener noreferrer';
+  actions.append(makeInterestButton(item),official);
+  box.append(price,address,savings,status,actions);return box;
+}
+function refreshVisiblePins() {
+  if (!propertyMap || !propertyPinsLayer || $('mapPanel').hidden) return;
+  propertyPinsLayer.clearLayers();
+  const entries=currentPinItems();
+  // Agrupamento simples por pixels, executado somente para pins já geocodificados.
+  const groups=new Map();
+  for(const entry of entries) {
+    const px=propertyMap.project([entry.lat,entry.lon],propertyMap.getZoom());
+    const key=Math.round(px.x/52)+':'+Math.round(px.y/52);
+    if(!groups.has(key))groups.set(key,[]);
+    groups.get(key).push(entry);
+  }
+  for(const group of groups.values()) {
+    if(group.length===1 || propertyMap.getZoom()>=16) {
+      for(const point of group) {
+        const marker=L.marker([point.lat,point.lon],{icon:bluePin(),title:'Imóvel '+point.item.id});
+        marker.bindPopup(() => makePopup(point.item,point));
+        propertyPinsLayer.addLayer(marker);
+      }
+    } else {
+      const lat=group.reduce((a,b)=>a+b.lat,0)/group.length;
+      const lon=group.reduce((a,b)=>a+b.lon,0)/group.length;
+      const marker=L.marker([lat,lon],{icon:L.divIcon({className:'geo-cluster-icon',html:'<span class="geo-cluster-bubble">'+group.length+'</span>',iconSize:[40,40],iconAnchor:[20,20]})});
+      marker.bindTooltip(group.length+' imóveis nesta área · clique para aproximar');
+      marker.on('click',()=>propertyMap.setView([lat,lon],Math.min(16,propertyMap.getZoom()+2)));
+      propertyPinsLayer.addLayer(marker);
+    }
+  }
+  $('mappedCount').textContent=integer.format(entries.length)+(entries.length===1?' imóvel localizado no mapa':' imóveis localizados no mapa');
+}
+function showPin(lat,lon,title,exact) {
+  if(!propertyMap)return;
+  if(mapMarker)propertyMap.removeLayer(mapMarker);
+  mapMarker=L.marker([lat,lon],{icon:bluePin(),title:String(title)}).addTo(propertyMap);
+  const popup=document.createElement('span');popup.textContent=title;
+  mapMarker.bindPopup(popup).openPopup();
+  propertyMap.setView([lat,lon],exact?15:12);
+}
+function storePin(item,point) {
+  if (!Number.isFinite(Number(point.lat)) || !Number.isFinite(Number(point.lon))) return false;
+  if(point.precision!=='building'&&point.precision!=='street')return false;
+  const entry={item,lat:Number(point.lat),lon:Number(point.lon),precision:point.precision};
+  propertyPinData.set(String(item.id),entry);
+  return true;
+}
+const mapCandidateItems=()=>matches.filter(i=>i.address&&i.city&&i.uf).slice(0,50);
+async function syncPropertyPins(resolve=false) {
+  if (!base || $('mapPanel').hidden || !initPropertyMap()) return;
+  if(mapPinsBusy)return;
+  // Só consulta novos endereços quando há uma cidade específica.
+  const city=$('city').value,uf=$('uf').value;
+  if(resolve && (!city||!uf)) { mapMessage('Para localizar imóveis, selecione primeiro UF e cidade.');return; }
+  const items=mapCandidateItems();
+  if(!items.length){refreshVisiblePins();mapMessage('Nenhum imóvel com endereço nos filtros atuais.');return;}
+  const token=++mapPinsToken;
+  mapPinsBusy=true;$('loadMapPins').disabled=true;
+  mapMessage(resolve?'Localizando alguns imóveis desta cidade. Os demais serão carregados sob demanda…':'Consultando localizações já armazenadas…');
+  try {
+    const response=await fetch('/api/coordenadas',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ids:items.map(i=>String(i.id)),resolve})
+    });
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok) throw Error(data.error||'Não foi possível consultar as coordenadas.');
+    if(token!==mapPinsToken)return;
+    const byId=new Map(items.map(i=>[String(i.id),i]));
+    for(const point of (data.points||[])) {
+      const item=byId.get(String(point.id));
+      if(item)storePin(item,point);
+    }
+    refreshVisiblePins();
+    const count=currentPinItems().length;
+    if(resolve && !data.configured) mapMessage('Para marcar imóveis automaticamente, configure GEOAPIFY_API_KEY no Cloudflare. O mapa e os filtros continuam funcionando.');
+    else if(data.limitReached) mapMessage('Limite de consultas atingido por agora. Os pins já salvos continuam visíveis.');
+    else if(resolve) mapMessage(count+' imóveis com posição cadastrada nesta seleção. Clique em “Mostrar mais imóveis” para avançar aos próximos. Posições aproximadas exigem conferência.');
+    else if(!count && data.configured && city)mapMessage('Ainda não há imóveis localizados nesta cidade. Clique em “Mostrar mais imóveis no mapa”.');
+    else if(!count)mapMessage('Selecione UF e cidade para visualizar imóveis localizados.');
+    else mapMessage('Exibindo '+count+' imóveis com coordenadas já armazenadas.');
+  } catch(error) {mapMessage(error.message||'Falha ao consultar os pins.');}
+  finally {mapPinsBusy=false;$('loadMapPins').disabled=false;}
 }
 async function searchMapLocation(query) {
-  if (geoCache.has(query)) return geoCache.get(query);
-  const params = new URLSearchParams({format:'jsonv2',limit:'3',countrycodes:'br',addressdetails:'1',q:query});
-  const response = await fetch('https://nominatim.openstreetmap.org/search?' + params, {headers:{Accept:'application/json'}});
-  if (!response.ok) throw Error('Serviço de localização indisponível. Tente novamente mais tarde.');
-  const found = await response.json();
-  const result = found.find(entry => Number.isFinite(Number(entry.lat)) && Number.isFinite(Number(entry.lon))) || null;
+  if(geoCache.has(query)) return geoCache.get(query);
+  // Apenas pedido manual do visitante (não usado para geração em lote).
+  const params=new URLSearchParams({format:'jsonv2',limit:'2',countrycodes:'br',addressdetails:'1',q:query});
+  const response=await fetch('https://nominatim.openstreetmap.org/search?'+params,{headers:{Accept:'application/json'}});
+  if(!response.ok)throw Error('Serviço de localização indisponível.');
+  const list=await response.json();
+  const result=list.find(x=>Number.isFinite(+x.lat)&&Number.isFinite(+x.lon))||null;
   geoCache.set(query,result);
   return result;
 }
-async function locateOnMap(query, label, exact, item = null) {
-  if (geocodeBusy) { mapMessage('Aguarde a localização anterior terminar.'); return; }
-  if (!initPropertyMap()) return;
-  geocodeBusy = true;
-  mapMessage('Procurando: ' + label + '...');
+async function locateOnMap(query,label,exact,item=null) {
+  if(!initPropertyMap())return;
+  mapMessage('Procurando: '+label+'…');
+  // Nos imóveis, usa o serviço com cache para todos os visitantes.
+  if(item) {
+    try {
+      const response=await fetch('/api/coordenadas',{
+        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:[String(item.id)],resolve:true})
+      });
+      const data=await response.json().catch(()=>({}));
+      const point=(data.points||[]).find(p=>String(p.id)===String(item.id));
+      if(point && storePin(item,point)) {
+        refreshVisiblePins();
+        propertyMap.setView([Number(point.lat),Number(point.lon)],15);
+        mapMessage(point.precision==='building'?'Posição estimada do imóvel. Confira antes de visitar.':'Localização aproximada da rua; não indica o número exato do imóvel.');
+        return;
+      }
+      if(response.ok&&data.configured) {
+        mapMessage('Endereço não identificado com segurança. Confira na página da Caixa.');return;
+      }
+    } catch {}
+  }
+  // Alternativa manual quando a API dedicada ainda não foi configurada.
   try {
-    let result = await searchMapLocation(query);
-    let approximate = !exact;
-    if (!result && item?.city && item?.uf) {
-      mapMessage('Endereço completo não encontrado. Procurando a cidade...');
-      result = await searchMapLocation([item.city,item.uf,'Brasil'].join(', '));
-      approximate = true;
-    }
-    if (!result) throw Error('Localização não encontrada. Confira o endereço na página oficial da Caixa.');
-    const popupLabel = approximate ? 'Região aproximada de ' + (item?.city || label) + ' — não indica a posição do imóvel' : label + ' — posição sugerida, não confirmada';
-    showPin(Number(result.lat),Number(result.lon),popupLabel,!approximate);
-    propertyMap.invalidateSize({pan:false});
-    mapMessage(approximate ? 'Localização aproximada da cidade. O marcador NÃO indica o endereço do imóvel.' : 'Endereço sugerido pelo mapa, sem confirmação. Confira a localização antes de visitar.');
-  } catch (error) { mapMessage(error.message || 'Falha ao localizar endereço.'); }
-  finally { geocodeBusy = false; }
+    const result=await searchMapLocation(query);
+    if(!result)throw Error('Localização não encontrada. Confira a página oficial da Caixa.');
+    const positionText=item?'Localização sugerida, não confirmada do imóvel '+item.id:label;
+    showPin(+result.lat,+result.lon,positionText,false);
+    mapMessage('Posição aproximada da pesquisa; NÃO indica necessariamente o endereço do imóvel.');
+  } catch(error) {mapMessage(error.message||'Falha ao localizar endereço.');}
 }
 function renderMapCards() {
-  if ($('mapPanel').hidden) return;
-  const container = $('mapList');
-  container.replaceChildren();
-  const subset = matches.slice(0,100);
-  for (const item of subset) {
-    const card = document.createElement('div'); card.className = 'map-card';
-    const title = document.createElement('strong'); title.textContent = currency.format(item.price);
-    const addr = document.createElement('small'); addr.textContent = [item.address,item.district,item.city,item.uf].filter(Boolean).join(' · ');
-    const discount = document.createElement('small'); discount.textContent = 'Desconto: ' + percent.format(item.discount/100) + ' · Imóvel ' + item.id;
-    const actions = document.createElement('div'); actions.className = 'map-card-actions';
-    const locate = document.createElement('button'); locate.type='button'; locate.textContent='📍 Localizar endereço';
-    locate.addEventListener('click', () => locateOnMap([item.address,item.district,item.city,item.uf,'Brasil'].filter(Boolean).join(', '), 'Imóvel ' + item.id + ' — ' + item.address, true, item));
-    const official = document.createElement('a'); official.className='link'; official.textContent='Ver na Caixa'; official.href=item.url; official.target='_blank'; official.rel='noopener noreferrer';
-    actions.append(locate,makeInterestButton(item),official);
-    card.append(title,addr,discount,actions);container.append(card);
+  if($('mapPanel').hidden)return;
+  const container=$('mapList');container.replaceChildren();
+  const subset=matches.slice(0,35);
+  for(const item of subset) {
+    const card=document.createElement('div');card.className='map-card';
+    const title=document.createElement('strong');title.textContent=currency.format(item.price);
+    const address=document.createElement('small');address.textContent=[item.address,item.district,item.city,item.uf].filter(Boolean).join(' · ');
+    const discount=document.createElement('small');discount.textContent='Desconto: '+percent.format(item.discount/100)+' · Imóvel '+item.id;
+    const buttons=document.createElement('div');buttons.className='map-card-actions';
+    const locate=document.createElement('button');locate.type='button';locate.textContent='📍 Localizar imóvel';
+    locate.addEventListener('click',()=>locateOnMap([item.address,item.district,item.city,item.uf,'Brasil'].filter(Boolean).join(', '),'Imóvel '+item.id,true,item));
+    const link=document.createElement('a');link.className='link';link.textContent='Ver na Caixa';link.href=item.url;link.target='_blank';link.rel='noopener noreferrer';
+    buttons.append(locate,makeInterestButton(item),link);
+    card.append(title,address,discount,buttons);container.append(card);
   }
-  if (matches.length > subset.length) {
-    const note = document.createElement('div'); note.className='map-notice'; note.textContent='Exibindo os primeiros ' + subset.length + ' imóveis dos ' + integer.format(matches.length) + ' filtrados. Refine UF, cidade ou preço para ver outros.'; container.append(note);
-  }
-  if (!subset.length) container.textContent='Nenhum imóvel encontrado com os filtros atuais.';
+  if(matches.length>subset.length){const more=document.createElement('div');more.className='map-notice';more.textContent='Lista lateral: primeiros '+subset.length+' de '+integer.format(matches.length)+' imóveis. Use os filtros para refinar.';container.append(more);}
+  if(!subset.length)container.textContent='Nenhum imóvel encontrado com estes filtros.';
+  refreshVisiblePins();
 }
-$('toggleMap').addEventListener('click', () => {
-  $('mapPanel').hidden = false;
-  $('toggleMap').textContent = '🗺️ Mapa aberto';
-  initPropertyMap(); renderMapCards();
-  requestAnimationFrame(() => propertyMap?.invalidateSize({pan:false}));
-  setTimeout(() => propertyMap?.invalidateSize({pan:false}), 300);
+$('toggleMap').addEventListener('click',()=>{
+  $('mapPanel').hidden=false;$('toggleMap').textContent='🗺️ Mapa aberto';
+  initPropertyMap();renderMapCards();
+  requestAnimationFrame(()=>propertyMap?.invalidateSize({pan:false}));
   $('mapPanel').scrollIntoView({behavior:'smooth',block:'start'});
+  // Somente a cidade filtrada ativa a busca controlada de novos pins.
+  syncPropertyPins(Boolean($('uf').value&&$('city').value));
 });
-$('closeMap').addEventListener('click', () => {
-  $('mapPanel').hidden = true; $('toggleMap').textContent='🗺️ Ver no mapa';
+$('closeMap').addEventListener('click',()=>{
+  $('mapPanel').hidden=true;$('toggleMap').textContent='🗺️ Ver no mapa';++mapPinsToken;
 });
-$('mapCity').addEventListener('click', () => {
-  const city=$('city').value, uf=$('uf').value;
-  if (!city || !uf) { mapMessage('Selecione primeiro o Estado (UF) e a Cidade nos filtros acima.'); return; }
-  locateOnMap([city,uf,'Brasil'].join(', '),city + ' / ' + uf,false);
+$('loadMapPins').addEventListener('click',()=>syncPropertyPins(true));
+$('mapCity').addEventListener('click',()=>{
+  const city=$('city').value,uf=$('uf').value;
+  if(!city||!uf){mapMessage('Selecione primeiro UF e cidade nos filtros.');return;}
+  locateOnMap([city,uf,'Brasil'].join(', '),city+' / '+uf,false);
 });
 
 function renderPage() {
