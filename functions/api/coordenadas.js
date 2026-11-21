@@ -68,10 +68,22 @@ export async function onRequest({request,env}) {
     const requested=Array.isArray(body.ids)?body.ids.map(String).filter(validId).slice(0,50):[];
     const ids=[...new Set(requested)];
     if(!ids.length)return answer({error:'Informe identificadores de imóveis.'},400);
-    const listing=await env.IMOVEIS_KV.get('lista','json');
-    if(!listing || !Array.isArray(listing.items))return answer({error:'Base de imóveis indisponível.'},503);
-    const set=new Set(ids);
-    const matches=new Map(listing.items.filter(x=>set.has(String(x.id))).map(x=>[String(x.id),x]));
+    const index=await env.IMOVEIS_KV.get('geo-index:active','json');
+    if(!index?.revision)return answer({error:'Índice geográfico ainda não inicializado. Execute a indexação administrativa uma vez.',code:'INDEX_NOT_READY'},503);
+    const bucketFor=id=>{
+      let h=2166136261;
+      for(const c of String(id)){h^=c.charCodeAt(0);h=Math.imul(h,16777619);}
+      return (h>>>0)%16;
+    };
+    const groups=new Map();
+    for(const id of ids){const b=bucketFor(id);if(!groups.has(b))groups.set(b,[]);groups.get(b).push(id);}
+    const matches=new Map();
+    // Lê apenas partições compactas, não o JSON de todos os imóveis.
+    for(const [bucket,group] of groups){
+      const shard=await env.IMOVEIS_KV.get(`geo-index:${index.revision}:${bucket}`,'json');
+      if(!shard)return answer({error:'Índice geográfico incompleto. Refaça a indexação.',code:'INDEX_INCOMPLETE'},503);
+      for(const id of group)if(shard[id])matches.set(id,shard[id]);
+    }
     const points=[];
     const uncached=[];
     for(const id of ids) {
@@ -87,7 +99,7 @@ export async function onRequest({request,env}) {
     let attempted=0,limitReached=false;
     if(body.resolve===true && configured && uncached.length) {
       // Pequenos lotes sob demanda, com limite por visitante. KV não é limitador atômico global.
-      for(const entry of uncached.slice(0,5)) {
+      for(const entry of uncached.slice(0,2)) {
         if(!(await dailyRateLimit(env,request))){limitReached=true;break;}
         attempted++;
         try {
@@ -95,7 +107,7 @@ export async function onRequest({request,env}) {
           await env.IMOVEIS_KV.put(entry.storageKey,JSON.stringify({hash:entry.hash,point}),{expirationTtl:point?2592000:604800});
           if(point)points.push({id:entry.id,...point});
         } catch(error) {
-          return answer({error:error.message||'Falha na consulta de coordenadas.',points,configured,attempted},502);
+          return answer({error:error.message||'Falha na consulta de coordenadas.',points,configured,attempted},503);
         }
       }
     }
